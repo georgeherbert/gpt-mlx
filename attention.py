@@ -1,18 +1,16 @@
 import mlx.core as mx
-from mlx.nn.layers.base import Module
-from mlx.nn.layers.dropout import Dropout
-from mlx.nn.layers.linear import Linear
+import mlx.nn as nn
 
 from constants import BLOCK_SIZE, DROPOUT, EMBEDDING_DIMENSIONS
 
 
-class Head(Module):
+class Head(nn.Module):
     def __init__(self, head_size: int) -> None:
         super().__init__()
-        self.key = Linear(EMBEDDING_DIMENSIONS, head_size, bias=False)
-        self.query = Linear(EMBEDDING_DIMENSIONS, head_size, bias=False)
-        self.value = Linear(EMBEDDING_DIMENSIONS, head_size, bias=False)
-        self.dropout = Dropout(DROPOUT)
+        self.key = nn.Linear(EMBEDDING_DIMENSIONS, head_size, bias=False)
+        self.query = nn.Linear(EMBEDDING_DIMENSIONS, head_size, bias=False)
+        self.value = nn.Linear(EMBEDDING_DIMENSIONS, head_size, bias=False)
+        self.dropout = nn.Dropout(DROPOUT)
 
         self.triangle_lower = mx.tril(mx.ones([BLOCK_SIZE, BLOCK_SIZE]))
 
@@ -32,12 +30,12 @@ class Head(Module):
         return weights @ values
 
 
-class MultiHeadAttention(Module):
+class MultiHeadAttention(nn.Module):
     def __init__(self, num_heads: int, head_size: int) -> None:
         super().__init__()
         self.heads = [Head(head_size) for _ in range(num_heads)]
-        self.projection = Linear(EMBEDDING_DIMENSIONS, EMBEDDING_DIMENSIONS)
-        self.dropout = Dropout(DROPOUT)
+        self.projection = nn.Linear(EMBEDDING_DIMENSIONS, EMBEDDING_DIMENSIONS)
+        self.dropout = nn.Dropout(DROPOUT)
 
     def __call__(self, x: mx.array) -> mx.array:
         out = mx.concatenate([head(x) for head in self.heads], axis=-1)
