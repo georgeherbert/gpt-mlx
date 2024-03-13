@@ -1,3 +1,5 @@
+from typing import Iterator
+
 import mlx.core as mx
 import mlx.nn as nn
 
@@ -33,11 +35,10 @@ class GPT(nn.Module):
 
         return x
 
-    def generate(self, x: mx.array, num_tokens: int) -> mx.array:
+    def generate(self, x: mx.array, num_tokens: int) -> Iterator[int]:
         for _ in range(num_tokens):
             x_cropped = x[:, -BLOCK_SIZE:]
             logits = self(x_cropped)[:, -1, :]
             next_token = mx.random.categorical(logits, axis=-1, num_samples=1)
             x = mx.concatenate([x, next_token], axis=1)
-
-        return x
+            yield next_token.item()

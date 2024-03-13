@@ -5,6 +5,7 @@ from typing import Callable
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+from mlx.utils import tree_flatten, tree_unflatten
 
 from constants import BATCH_SIZE, BLOCK_SIZE, LEARNING_RATE
 from gpt import GPT
@@ -36,19 +37,36 @@ def get_batch(data: mx.array) -> tuple[mx.array, mx.array]:
     return x, y
 
 
-def generate(
-    model: GPT,
-    decoder: Callable[[list[int]], str],
-    num_tokens: int,
-) -> str:
-    context = mx.zeros((1, 1), dtype=mx.uint32)
-    new_tokens = model.generate(context, num_tokens).squeeze().tolist()
-    return decoder(new_tokens)
+
 
 
 def loss_function(model: GPT, x: mx.array, y: mx.array) -> mx.array:
     logits = model(x)
     return nn.losses.cross_entropy(logits, y, reduction="mean")
+
+
+def save_optimiser(optimiser: optim.Optimizer, path: Path) -> None:
+    params_dict = dict(tree_flatten(optimiser.state))
+    mx.save_safetensors(str(path), params_dict)
+
+
+def save_checkpoint(model: GPT, optimiser: optim.Optimizer, iteration: int) -> None:
+    checkpoint_path = Path(f"checkpoints/{iteration}")
+    checkpoint_path.mkdir(exist_ok=True, parents=True)
+    model.save_weights(str(checkpoint_path / "model.safetensors"))
+    save_optimiser(optimiser, checkpoint_path / "optimiser.safetensors")
+
+
+# TODO: Find a proper way to load the optimiser.
+# def load_optimiser(optimiser: optim.Optimizer, path: Path) -> None:
+#     params = list(mx.load(str(path)).items())
+#     optimiser.state = tree_unflatten(params)
+
+
+# def load_checkpoint(model: GPT, optimiser: optim.Optimizer, iteration: int) -> None:
+#     checkpoint_path = Path(f"checkpoints/{iteration}")
+#     model.load_weights(str(checkpoint_path / "model.safetensors"))
+#     load_optimiser(optimiser, checkpoint_path / "optimiser.safetensors")
 
 
 def main() -> None:
@@ -74,16 +92,16 @@ def main() -> None:
         optimiser.update(model, gradient)
         return loss
 
-    iterations = 100
-    for iteration in range(iterations):
+    iterations = 3000
+    for i in range(optimiser.step.item(), iterations):
         x, y = get_batch(train_data)
-
         loss = step(x, y)
-
         mx.eval(state)
-        print(iteration, loss.item())
 
-    print(generate(model, decoder, 250))
+        if i % 500 == 0 or i == iterations - 1:
+            save_checkpoint(model, optimiser, i)
+
+        print(i, loss.item())
 
 
 if __name__ == "__main__":
