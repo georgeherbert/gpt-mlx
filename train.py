@@ -37,9 +37,6 @@ def get_batch(data: mx.array) -> tuple[mx.array, mx.array]:
     return x, y
 
 
-
-
-
 def loss_function(model: GPT, x: mx.array, y: mx.array) -> mx.array:
     logits = model(x)
     return nn.losses.cross_entropy(logits, y, reduction="mean")
