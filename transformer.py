@@ -22,11 +22,7 @@ class FeedForward(nn.Module):
 class TransformerLayer(nn.Module):
     def __init__(self, num_heads: int) -> None:
         super().__init__()
-        head_size = EMBEDDING_DIMENSIONS // num_heads
-
-        # TODO: Ensure that the number of heads divides the embedding dimensions?
-
-        self.self_attention = MultiHeadAttention(num_heads, head_size)
+        self.self_attention = MultiHeadAttention(num_heads)
         self.feed_forward = FeedForward()
         self.layer_norm_1 = nn.LayerNorm(EMBEDDING_DIMENSIONS)
         self.layer_norm_2 = nn.LayerNorm(EMBEDDING_DIMENSIONS)

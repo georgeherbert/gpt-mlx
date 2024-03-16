@@ -13,9 +13,7 @@ class GPT(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, EMBEDDING_DIMENSIONS)
         self.positional_embedding_table = nn.Embedding(BLOCK_SIZE, EMBEDDING_DIMENSIONS)
 
-        self.blocks = nn.Sequential(
-            *[TransformerLayer(num_heads=NUM_HEADS) for _ in range(NUM_BLOCKS)]
-        )
+        self.blocks = nn.Sequential(*[TransformerLayer(num_heads=NUM_HEADS) for _ in range(NUM_BLOCKS)])
 
         self.layer_norm = nn.LayerNorm(EMBEDDING_DIMENSIONS)
         self.language_model_head = nn.Linear(EMBEDDING_DIMENSIONS, vocab_size)

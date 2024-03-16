@@ -21,9 +21,7 @@ def get_decoder(characters: list[str]) -> Callable[[list[int]], str]:
     return lambda integers: "".join(integer_to_character[i] for i in integers)
 
 
-def get_train_test_split(
-    data: mx.array, train_proportion: float = 0.9
-) -> tuple[mx.array, mx.array]:
+def get_train_test_split(data: mx.array, train_proportion: float = 0.9) -> tuple[mx.array, mx.array]:
     train_size = int(data.shape[0] * train_proportion)
     return data[:train_size], data[train_size:]
 

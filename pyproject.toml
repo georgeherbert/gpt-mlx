@@ -5,6 +5,8 @@ package-mode = false
 python = "^3.12"
 mlx = "^0.7.0"
 
+[tool.black]
+line-length = 120
 
 [build-system]
 requires = ["poetry-core"]

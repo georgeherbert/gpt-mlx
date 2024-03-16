@@ -26,7 +26,7 @@ def main() -> None:
     encoder = get_encoder(characters)
 
     model = GPT(vocab_size=len(characters))
-    model.load_weights("checkpoints/2500/model.safetensors")
+    model.load_weights("checkpoints/2999/model.safetensors")
 
     generate(model, decoder, 5000)
 
