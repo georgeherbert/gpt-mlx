@@ -5,18 +5,16 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 import numpy as np
+import numpy.typing as npt
 
 from constants import BATCH_SIZE, BLOCK_SIZE, LEARNING_RATE
 from gpt import GPT
 
 
-def get_batch(data: mx.array) -> tuple[mx.array, mx.array]:
-
-    # TODO: type here should be numpy?
-    # TODO: Why do we need the 1.?
-
+def get_batch(data: npt.NDArray) -> tuple[mx.array, mx.array]:
     indices = np.random.randint(0, data.shape[0] - BLOCK_SIZE, BATCH_SIZE)
-    # indices = mx.random.randint(0, data.shape[0] * 1. - BLOCK_SIZE, [BATCH_SIZE])  # TODO: Can't have large numbers?
+    # indices = mx.random.randint(0, data.shape[0] * 1. - BLOCK_SIZE, [BATCH_SIZE])
+    # TODO: Investigate why the above line is not working.
 
     x = mx.stack([mx.array(data[i.item() : i.item() + BLOCK_SIZE]) for i in indices])
     y = mx.stack([mx.array(data[i.item() + 1 : i.item() + BLOCK_SIZE + 1]) for i in indices])
@@ -51,7 +49,7 @@ def main() -> None:
         optimiser.update(model, gradient)
         return loss
 
-    iterations = 5000
+    iterations = 100000
     for i in range(optimiser.step.item(), iterations):
         x, y = get_batch(train_data)
 
