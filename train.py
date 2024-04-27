@@ -6,8 +6,9 @@ import mlx.nn as nn
 import mlx.optimizers as optim
 import numpy as np
 import numpy.typing as npt
+from mlx.utils import tree_flatten, tree_map
 
-from constants import BATCH_SIZE, BLOCK_SIZE, LEARNING_RATE
+from constants import ACCUMULATION_STEPS, BATCH_SIZE, BLOCK_SIZE, ITERATIONS, LEARNING_RATE
 from gpt import GPT
 
 
@@ -39,24 +40,33 @@ def main() -> None:
     model = GPT(vocab_size=50257)  # GPT2 vocab size
     optimiser = optim.AdamW(learning_rate=LEARNING_RATE)
 
+    num_parameters = sum(v.size for _, v in tree_flatten(model.parameters()))
+    print(f"Training a GPT model with {num_parameters / 1e6:.3f} million parameters.")
+
     loss_and_gradient_function = nn.value_and_grad(model, loss_function)
 
     state = [model.state, optimiser.state, mx.random.state]
 
     @partial(mx.compile, inputs=state, outputs=state)
-    def step(x, y):
-        loss, gradient = loss_and_gradient_function(model, x, y)
-        optimiser.update(model, gradient)
-        return loss
+    def step(x: mx.array, y: mx.array, accumulated_gradients: dict, i: int) -> tuple[mx.array, dict]:
+        loss, gradients = loss_and_gradient_function(model, x, y)
+        accumulated_gradients = tree_map(lambda acc, new: acc + new, accumulated_gradients, gradients)
 
-    iterations = 100000
-    for i in range(optimiser.step.item(), iterations):
+        if i % ACCUMULATION_STEPS == 0:
+            optimiser.update(model, accumulated_gradients)
+            accumulated_gradients = tree_map(lambda x: mx.zeros_like(x), model.parameters())
+
+        return loss, accumulated_gradients
+
+    accumulated_gradients = tree_map(lambda x: mx.zeros_like(x), model.parameters())
+
+    for i in range(ITERATIONS):
         x, y = get_batch(train_data)
 
-        loss = step(x, y)
-        mx.eval(state)
+        loss, accumulated_gradients = step(x, y, accumulated_gradients, i)
+        mx.eval(state, accumulated_gradients)
 
-        if i % 500 == 0 or i == iterations - 1:
+        if i % 500 == 0 or i == ITERATIONS - 1:
             save_checkpoint(model, i)
 
         print(i, loss.item())
