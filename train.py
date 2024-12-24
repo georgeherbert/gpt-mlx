@@ -1,5 +1,4 @@
 import argparse
-import math
 from functools import partial
 from pathlib import Path
 
@@ -40,21 +39,7 @@ def get_batch(data: npt.NDArray) -> tuple[mx.array, mx.array]:
 
 
 def loss_function(model: GPT, x: mx.array, y: mx.array) -> mx.array:
-    logits = model(x)
-    return nn.losses.cross_entropy(logits, y, reduction="mean")
-
-
-def get_learning_rate(step_num: int) -> float:
-    # 1) Linear warmup for a warmup period steps
-    if step_num < LR_WARMUP_ITERS:
-        return LR_MAX * step_num / LR_WARMUP_ITERS
-    # 2) If the step num is greater than the decay iterations, we return the minimum learning rate
-    if step_num > LR_DECAY_ITERS:
-        return LR_MIN
-    # 3) Between the above, we use a cosine decay down to the minimum learning rate
-    decay_ratio = (step_num - LR_WARMUP_ITERS) / (LR_DECAY_ITERS - LR_WARMUP_ITERS)
-    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
-    return LR_MIN + coeff * (LR_MAX - LR_MIN)
+    return nn.losses.cross_entropy(model(x), y, reduction="mean")
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,8 +52,17 @@ def train(args) -> None:
     train_data = np.memmap("data/train.bin", dtype=np.uint16, mode="r")
 
     model = GPT(vocab_size=50257)  # GPT2 vocab size
+
+    learning_rate_schedule = optim.join_schedules(
+        schedules=[
+            optim.linear_schedule(init=0, end=LR_MAX, steps=LR_WARMUP_ITERS),
+            optim.cosine_decay(init=LR_MAX, decay_steps=LR_DECAY_ITERS, end=LR_MIN)
+        ],
+        boundaries=[LR_WARMUP_ITERS]
+    )
+
     optimizer = optim.AdamW(
-        learning_rate=LR_MAX,
+        learning_rate=learning_rate_schedule,
         betas=[BETA1, BETA2],
         weight_decay=WEIGHT_DECAY,
     )
@@ -99,8 +93,6 @@ def train(args) -> None:
     for step_num in range(optimizer.step.item(), ITERATIONS):
         total_loss = 0.0
         acc_gradients = tree_map(lambda x: mx.zeros_like(x), model.parameters())
-
-        optimizer.learning_rate = get_learning_rate(step_num)
 
         for micro_step_num in range(ACCUMULATION_STEPS):
             batch = get_batch(train_data)
