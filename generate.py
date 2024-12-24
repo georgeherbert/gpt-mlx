@@ -15,7 +15,7 @@ def generate(model: GPT, num_tokens: int) -> None:
 
 def main() -> None:
     model = GPT(vocab_size=50257)  # TODO: Magic number
-    model.load_weights("checkpoints/20240427_225559/1750/model.safetensors")
+    model.load_weights("checkpoints/20240501_003359/3000/model.safetensors")
 
     generate(model, 5000)
 

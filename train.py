@@ -1,5 +1,6 @@
 import argparse
 import math
+from functools import partial
 from pathlib import Path
 
 import mlx.core as mx
@@ -32,8 +33,8 @@ def get_batch(data: npt.NDArray) -> tuple[mx.array, mx.array]:
     # indices = mx.random.randint(0, data.shape[0] * 1. - BLOCK_SIZE, [BATCH_SIZE])
     # TODO: Investigate why the above line is not working.
 
-    x = mx.stack([mx.array(data[i.item() : i.item() + BLOCK_SIZE]) for i in indices])
-    y = mx.stack([mx.array(data[i.item() + 1 : i.item() + BLOCK_SIZE + 1]) for i in indices])
+    x = mx.stack([mx.array(data[i.item(): i.item() + BLOCK_SIZE]) for i in indices])
+    y = mx.stack([mx.array(data[i.item() + 1: i.item() + BLOCK_SIZE + 1]) for i in indices])
 
     return x, y
 
@@ -47,7 +48,7 @@ def get_learning_rate(step_num: int) -> float:
     # 1) Linear warmup for a warmup period steps
     if step_num < LR_WARMUP_ITERS:
         return LR_MAX * step_num / LR_WARMUP_ITERS
-    # 2) If the step num is greater than the decay iterations, we return the mimimum learning rate
+    # 2) If the step num is greater than the decay iterations, we return the minimum learning rate
     if step_num > LR_DECAY_ITERS:
         return LR_MIN
     # 3) Between the above, we use a cosine decay down to the minimum learning rate
@@ -80,38 +81,36 @@ def train(args) -> None:
     num_parameters = sum(v.size for _, v in tree_flatten(model.parameters()))
     print(f"Training a GPT model with {num_parameters / 1e6:.3f} million parameters.")
 
-    loss_and_gradient_function = nn.value_and_grad(model, loss_function)
-
     state = [model.state, optimizer.state, mx.random.state]
 
-    # @partial(mx.compile, inputs=state, outputs=state)
-    def step(x: mx.array, y: mx.array, accumulated_gradients: dict, micro_step_num: int) -> tuple[mx.array, dict]:
-        loss, gradients = loss_and_gradient_function(model, x, y)
-        accumulated_gradients = tree_map(lambda acc, new: acc + new, accumulated_gradients, gradients)
+    @partial(mx.compile, inputs=state, outputs=state)
+    def step_acc(batch_x: mx.array, batch_y: mx.array, prev_acc_gradients: dict) -> tuple[mx.array, dict]:
+        batch_loss, batch_gradients = nn.value_and_grad(model, loss_function)(model, batch_x, batch_y)
+        new_acc_gradients = tree_map(lambda a, b: a + b, prev_acc_gradients, batch_gradients)
+        return batch_loss, new_acc_gradients
 
-        if (micro_step_num + 1) % ACCUMULATION_STEPS == 0:
-            accumulated_gradients = tree_map(lambda x: x / ACCUMULATION_STEPS, gradients)
-            optimizer.update(model, accumulated_gradients)
-            accumulated_gradients = tree_map(lambda x: mx.zeros_like(x), model.parameters())
-
-        return loss, accumulated_gradients
-
-    accumulated_gradients = tree_map(lambda x: mx.zeros_like(x), model.parameters())
+    @partial(mx.compile, inputs=state, outputs=state)
+    def step_apply(fully_acc_gradients: dict) -> None:
+        normalised_acc_gradients = tree_map(lambda a: a / ACCUMULATION_STEPS, fully_acc_gradients)
+        optimizer.update(model, normalised_acc_gradients)
 
     train_loss_path = checkpoints_path / "train_loss.csv"
 
     for step_num in range(optimizer.step.item(), ITERATIONS):
         total_loss = 0.0
+        acc_gradients = tree_map(lambda x: mx.zeros_like(x), model.parameters())
 
         optimizer.learning_rate = get_learning_rate(step_num)
 
         for micro_step_num in range(ACCUMULATION_STEPS):
-            x, y = get_batch(train_data)
+            batch = get_batch(train_data)
+            loss, acc_gradients = step_acc(*batch, acc_gradients)
 
-            loss, accumulated_gradients = step(x, y, accumulated_gradients, micro_step_num)
+            if micro_step_num == ACCUMULATION_STEPS - 1:
+                step_apply(acc_gradients)
+
+            mx.eval(loss, state, acc_gradients)
             total_loss += loss.item()
-
-            mx.eval(state, accumulated_gradients)
 
             print(
                 f"Step [{step_num}]\t\t"
