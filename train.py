@@ -61,7 +61,7 @@ def train(args) -> None:
         boundaries=[LR_WARMUP_ITERS]
     )
 
-    optimizer = optim.AdamW(
+    optimizer = optim.Lion(
         learning_rate=learning_rate_schedule,
         betas=[BETA1, BETA2],
         weight_decay=WEIGHT_DECAY,
