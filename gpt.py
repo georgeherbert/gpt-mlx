@@ -33,10 +33,10 @@ class GPT(nn.Module):
 
         return x
 
-    def generate(self, x: mx.array, num_tokens: int) -> Iterator[int]:
+    def generate(self, x: mx.array, num_tokens: int, temperature: float = 1.0) -> Iterator[int]:
         for _ in range(num_tokens):
             x_cropped = x[:, -BLOCK_SIZE:]
-            logits = self(x_cropped)[:, -1, :]
+            logits = self(x_cropped)[:, -1, :] * (1 / temperature)
             next_token = mx.random.categorical(logits, axis=-1, num_samples=1)
             x = mx.concatenate([x, next_token], axis=1)
             yield next_token.item()
