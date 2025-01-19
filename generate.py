@@ -23,9 +23,9 @@ def generate(model: GPT, num_tokens: int, temperature: float = 1.0, prompt: str 
 
 def main() -> None:
     model = GPT(vocab_size=50257)  # TODO: Magic number
-    model.load_weights("checkpoints/20241224_154913/2000/model.safetensors")
+    model.load_weights("checkpoints/20241224_154913/7000/model.safetensors")
 
-    generate(model=model, num_tokens=5000, temperature=0.95)
+    generate(model=model, num_tokens=5000, temperature=0.9)
 
 
 if __name__ == "__main__":
