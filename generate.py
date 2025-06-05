@@ -5,11 +5,11 @@ from gpt import GPT
 
 
 def unconditional_context() -> mx.array:
-    return mx.zeros((1, 1), dtype=mx.uint32)
+    return mx.zeros((1, 1), dtype=mx.uint16)
 
 
 def conditional_context(encoder: tiktoken.Encoding, prompt: str) -> mx.array:
-    return mx.reshape(mx.array(encoder.encode(prompt), dtype=mx.uint32), (1, -1))
+    return mx.reshape(mx.array(encoder.encode(prompt), dtype=mx.uint16), (1, -1))
 
 
 def generate(model: GPT, num_tokens: int, temperature: float = 1.0, prompt: str | None = None) -> None:
